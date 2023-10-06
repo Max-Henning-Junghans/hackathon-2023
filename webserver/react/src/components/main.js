@@ -1,6 +1,7 @@
 //import Searchbar from "./searchbar";
 //import ResultBox from "./resultBox";
 //import {useState} from "react";
+import Canvas from ./Canvas;
 
 function Main() {
     //const [api, updateApi] = useState(() => {
@@ -12,7 +13,7 @@ function Main() {
     return (
         <div className="d-flex justify-content-center">
             <div className="d-flex flex-column">
-                MOIN!!!
+                <Canvas/>
             </div>
         </div>
     );
