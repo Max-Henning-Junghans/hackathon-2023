@@ -13,8 +13,6 @@ function Main() {
         <div className="d-flex justify-content-center">
             <div className="d-flex flex-column">
                 MOIN!!!
-                //<Searchbar update={updateApi}/>
-                //<ResultBox url={"http://127.0.0.1:5000/api/v1/food/" + api}/>
             </div>
         </div>
     );
