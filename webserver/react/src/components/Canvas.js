@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from 'react'
 
-const Canvas = props => {
+function Canvas = props => {
 
     const canvasRef = useRef(null)
 
