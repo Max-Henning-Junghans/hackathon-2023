@@ -9,7 +9,16 @@ const MAXIMUM_Y = 1.5;
 const MINIMUM_INTENSITY = 0;
 const MAXIMUM_INTENSITY = 25;
 
+const TIME_SPAN_PATH = "-60s";
+const TIME_SPAN_HEAT_MAP = "-6000s";
+
 const GRID_SIZE = 0.2;
+
+const XZONES = {
+  "ARHE-0129": { x: 0.5, y: 0.5 },
+  "ARJF-0036": { x: 1, y: 0.5 },
+};
+const XZONE_SIZE = 0.1;
 
 const TOKEN =
   "3zK40TmVz0-kpnise5PejCO40GhgIxFKcAORGB2hnjbNHXjwqgC9FvxcmDFjdq-asdPoZurO02n9mTp-1jJZCA==";
@@ -21,16 +30,16 @@ function Map() {
 
   const [positionsWithIntensities, setPositionsWithIntensities] = useState([]);
   const [gridCells, setGridCells] = useState([]);
+  const [xzoneIntensities, setXzoneIntensities] = useState({});
 
   useEffect(() => {
     const interval = setInterval(() => {
       const queryApi = api.getQueryApi(ORG);
-      const timeSpan = "-60s";
       const timeSeriesQuery = `
         import "join"
         xs =
           from(bucket: "robomaster")
-            |> range(start: ${timeSpan})
+            |> range(start: ${TIME_SPAN_PATH})
             |> filter(fn: (r) => r["_measurement"] == "simulated_robot")
             |> filter(fn: (r) => r["_field"] == "x" or r["_field"] == "y")
             |> aggregateWindow(every: 1s, fn: mean, createEmpty: false)
@@ -40,7 +49,7 @@ function Map() {
     
         sensor_values = 
           from(bucket: "robomaster")
-            |> range(start: ${timeSpan})
+            |> range(start: ${TIME_SPAN_PATH})
             |> filter(fn: (r) => r["_measurement"] == "sps30")
             |> filter(fn: (r) => r["_field"] == "mass_pm10")
             |> filter(fn: (r) => r["device"] == "/dev/ttyUSB0")
@@ -64,8 +73,8 @@ function Map() {
         import "join"
         import "math"
         from(bucket: "robomaster")
-        |> range(start: ${timeSpan})
-        |> filter(fn: (r) => r["_measurement"] == "robot_position" or r["_measurement"] == "sps30")
+        |> range(start: ${TIME_SPAN_HEAT_MAP})
+        |> filter(fn: (r) => r["_measurement"] == "simulated_robot" or r["_measurement"] == "sps30")
         |> filter(fn: (r) => r["_field"] == "x" or r["_field"] == "y" or r["_field"] == "mass_pm10") // maybe delete them to get all values?
         |> aggregateWindow(every: 1s, fn: mean, createEmpty: false)
         |> keep(columns: ["_time", "_field", "_value"])
@@ -79,6 +88,13 @@ function Map() {
         |> group(columns: ["grid_x", "grid_y"])
         |> last(column: "_time")
         |> group()
+      `;
+      const xzoneQuery = `
+        from(bucket: "robomaster")
+        |> range(start: 0)
+        |> filter(fn: (r) => r["_measurement"] == "xzone")
+        |> filter(fn: (r) => r["_field"] == "CO2VOL") // maybe delete them to get all values?
+        |> last()
       `;
       const timeSeriesRows = [];
       queryApi.queryRows(timeSeriesQuery, {
@@ -130,11 +146,42 @@ function Map() {
           setGridCells(heatMapRows);
         },
       });
+      const collectedXzoneIntensities = {};
+      queryApi.queryRows(xzoneQuery, {
+        next: (row, tableMeta) => {
+          const tableObject = tableMeta.toObject(row);
+          collectedXzoneIntensities[tableObject.serial] = tableObject._value;
+        },
+        error: (error) => {
+          console.error("Error", error);
+        },
+        complete: () => {
+          setXzoneIntensities(collectedXzoneIntensities);
+        },
+      });
     }, 1000);
     return () => {
       clearInterval(interval);
     };
   }, []);
+
+  const xzones = Object.entries(XZONES).map(([name, { x, y }]) => (
+    <>
+      <circle
+        r={xzoneIntensities[name]}
+        cx={x}
+        cy={y}
+        fill="rgba(0, 0, 255, 0.25)"
+      />
+      <image
+        x={x - XZONE_SIZE / 2}
+        y={y - XZONE_SIZE / 2}
+        width={XZONE_SIZE}
+        height={XZONE_SIZE}
+        href="r2d2.webp"
+      />
+    </>
+  ));
 
   const numberOfSegments = positionsWithIntensities.length;
   const pathPoints = positionsWithIntensities.map(
@@ -172,16 +219,18 @@ function Map() {
           ],
     [null, []]
   );
-  const gridCellElements = gridCells.map(({ gridX, gridY, intensity }, index) => (
-    <rect
-      key={index}
-      x={gridX * GRID_SIZE - (GRID_SIZE / 2)}
-      y={gridY * GRID_SIZE - (GRID_SIZE / 2)}
-      width={GRID_SIZE}
-      height={GRID_SIZE}
-      fill={`rgba(0, 0, 255, ${intensity})`}
-    />
-  ));
+  const gridCellElements = gridCells.map(
+    ({ gridX, gridY, intensity }, index) => (
+      <rect
+        key={index}
+        x={gridX * GRID_SIZE - GRID_SIZE / 2}
+        y={gridY * GRID_SIZE - GRID_SIZE / 2}
+        width={GRID_SIZE}
+        height={GRID_SIZE}
+        fill={`rgba(0, 0, 255, ${intensity})`}
+      />
+    )
+  );
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -192,6 +241,7 @@ function Map() {
       {gridCellElements}
       {pathLines}
       {pathPoints}
+      {xzones}
     </svg>
   );
 }
