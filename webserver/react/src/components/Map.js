@@ -6,26 +6,15 @@ const MINIMUM_Y = -2;
 const MAXIMUM_X = 2;
 const MAXIMUM_Y = 2;
 
+const MINIMUM_INTENSITY = 0;
+const MAXIMUM_INTENSITY = 5;
+
 const TOKEN =
   "3zK40TmVz0-kpnise5PejCO40GhgIxFKcAORGB2hnjbNHXjwqgC9FvxcmDFjdq-asdPoZurO02n9mTp-1jJZCA==";
 const URL = "http://localhost:3000";
 const ORG = "draeger";
 
-// historie an positionen
-// sensorwert historie an position
-const POSITIONS_WITH_SENSOR_INTENSITIES = [
-  { x: -1, y: -1, intensity: 0.5 },
-  { x: -0.5, y: -1, intensity: 0.6 },
-  { x: 0, y: -1, intensity: 0.7 },
-  { x: 0.5, y: -1, intensity: 0.8 },
-  { x: 1, y: -1, intensity: 0.9 },
-  { x: 1, y: -0.5, intensity: 1 },
-  { x: 1, y: 0, intensity: 0.3 },
-  { x: 1, y: 0.5, intensity: 0.2 },
-  { x: 1, y: 1, intensity: 0.1 },
-];
-
-function Map(props) {
+function Map() {
   const api = useMemo(() => new InfluxDB({ url: URL, token: TOKEN }));
 
   const [positionsWithIntensities, setPositionsWithIntensities] = useState([]);
@@ -74,7 +63,14 @@ function Map(props) {
             time: tableObject._time,
             x: tableObject.x,
             y: tableObject.y,
-            intensity: tableObject.mass_pm10 / 5,
+            intensity: Math.max(
+              0,
+              Math.min(
+                1,
+                (tableObject.mass_pm10 - MINIMUM_INTENSITY) /
+                  (MAXIMUM_INTENSITY - MINIMUM_INTENSITY)
+              )
+            ),
           });
         },
         error: (error) => {
