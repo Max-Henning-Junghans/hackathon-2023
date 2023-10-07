@@ -188,12 +188,10 @@ function Map() {
     ({ x, y, intensity }, index) => (
       <circle
         key={index}
-        r="0.05"
+        r={intensity * 0.25}
         cx={x}
         cy={y}
-        fill={`rgba(${intensity * 255}, 0, ${(1 - intensity) * 255}, ${
-          (index + 1) / numberOfSegments
-        })`}
+        fill="rgba(0, 0, 255, 0.25)"
       />
     )
   );
@@ -214,6 +212,7 @@ function Map() {
                 fill="none"
                 stroke={`rgba(0, 0, 0, ${index / numberOfSegments})`}
                 strokeWidth="0.01"
+                strokeLinecap="round"
               />,
             ],
           ],
