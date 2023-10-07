@@ -1,0 +1,76 @@
+poweroff
+htop
+source /root/hackathon-2023/venv/bin/activate
+/root/hackathon-2023/venv/bin/python /root/hackathon-2023/robomaster/main.py
+htop
+pwd
+ls -al
+git clone https://github.com/Max-Henning-Junghans/hackathon-2023.git
+apt install git
+git clone https://github.com/Max-Henning-Junghans/hackathon-2023.git
+cd hackathon-2023/
+ls -al
+sudo apt install python
+sudo apt install python3
+python3 -m venv venv
+sudo apt install python3-venv
+python3 -m venv venv
+source venv/bin/activate
+pip install flask
+flask --app robomaster/main run
+flask --app robomaster/main --host 0.0.0.0 run
+flask --app robomaster/main run --host 0.0.0.0
+flask --app robomaster/main run --host 0.0.0.0
+flask --app robomaster/main run --host 0.0.0.0
+ls
+robomaster/install.sh 
+ip a
+ps afx
+ip a
+nano /etc/network/interfaces
+systemctl restart networking
+ip a
+ping 192.168.42.2
+git config --global user.email "root@robomaster"
+git config --global user.name "root"
+robomaster/install.sh 
+apt install build-essential#
+apt install build-essential
+robomaster/install.sh 
+robomaster/install.sh 
+robomaster/install.sh 
+ls -al /usr/include/python3.11
+ls -al /usr/include/python3
+ls -al /usr/include/
+python3 --version
+robomaster/install.sh 
+robomaster/install.sh 
+apt install python3-dev
+robomaster/install.sh 
+apt install libavcodec-dev
+apt install libavutil-dev libswscale-dev libopus-dev
+robomaster/install.sh 
+python3 robomaster/test_robot.py 
+pip install opencv-python
+apt install libgl1 libglib2.0-0
+python3 robomaster/test_robot.py 
+ip a
+systemctl restart networking
+ip a
+python3 robomaster/test_robot.py 
+python3 robomaster/test_robot.py 
+python3 robomaster/test_robot.py 
+python3 robomaster/test_robot.py 
+python3 robomaster/test_robot.py 
+pip install influxdb-client
+python3 robomaster/test_robot.py 
+ip a
+python3 robomaster/test_robot.py 
+ip a
+python3 robomaster/test_robot.py 
+ps afx
+python3 robomaster/test_robot.py 
+python3 robomaster/test_influx.py 
+python3 robomaster/test_influx.py 
+flask --app robomaster/main run --host 0.0.0.0
+flask --app robomaster/main run --host 0.0.0.0
