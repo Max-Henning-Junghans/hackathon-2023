@@ -1,4 +1,6 @@
-import Canvas from "./Canvas";
+import Canvas from "./CanvasMap";
+import Canvas from "./Graphs";
+import Canvas from "./CanvasHeat";
 
 function Main() {
     return (
