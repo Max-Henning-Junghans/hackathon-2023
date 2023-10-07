@@ -231,6 +231,17 @@ function Map() {
       />
     )
   );
+  const robotPosition =
+    positionsWithIntensities[positionsWithIntensities.length - 1];
+  const robotImage = robotPosition && (
+    <image
+      x={robotPosition.x - XZONE_SIZE / 2}
+      y={robotPosition.y - XZONE_SIZE / 2}
+      width={XZONE_SIZE}
+      height={XZONE_SIZE}
+      href="robot.png"
+    />
+  );
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -242,6 +253,7 @@ function Map() {
       {pathLines}
       {pathPoints}
       {xzones}
+      {robotImage}
     </svg>
   );
 }
