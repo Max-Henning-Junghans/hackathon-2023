@@ -15,7 +15,7 @@ function Graphs(props) {
 			},
 			{
 				x: [1, 2, 3, 4, 5, 6],
-				y: [2, 6, 3, 1, 2, 3],
+				y: [3, 4, 3, 1, 2, 3],
 				type: 'scatter',
 				mode: 'lines',
 				marker: {color: 'green'},
