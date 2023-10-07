@@ -1,7 +1,8 @@
 //import Searchbar from "./searchbar";
 //import ResultBox from "./resultBox";
 //import {useState} from "react";
-import Canvas from Canvas;
+//import Canvas from Canvas;
+from Canvas import Canvas;
 
 function Main() {
     //const [api, updateApi] = useState(() => {
