@@ -28,15 +28,37 @@ function Map() {
       const timeSpan = "-60s";
       const timeSeriesQuery = `
         import "join"
-        from(bucket: "robomaster")
-        |> range(start: ${timeSpan})
-        |> filter(fn: (r) => r["_measurement"] == "robot_position" or r["_measurement"] == "sps30")
-        |> filter(fn: (r) => r["_field"] == "x" or r["_field"] == "y" or r["_field"] == "mass_pm10") // maybe delete them to get all values?
-        |> aggregateWindow(every: 1s, fn: mean, createEmpty: false)
-        |> keep(columns: ["_time", "_field", "_value"])
-        |> pivot(rowKey: ["_time"], columnKey: ["_field"], valueColumn: "_value")
-        |> group()
-        |> sort(columns: ["_time"])
+        xs =
+          from(bucket: "robomaster")
+            |> range(start: ${timeSpan})
+            |> filter(fn: (r) => r["_measurement"] == "simulated_robot")
+            |> filter(fn: (r) => r["_field"] == "x" or r["_field"] == "y")
+            |> aggregateWindow(every: 1s, fn: mean, createEmpty: false)
+            |> keep(columns: ["_time", "_field", "_value"])
+            |> pivot(rowKey: ["_time"], columnKey: ["_field"], valueColumn: "_value")
+            |> group()
+    
+        sensor_values = 
+          from(bucket: "robomaster")
+            |> range(start: ${timeSpan})
+            |> filter(fn: (r) => r["_measurement"] == "sps30")
+            |> filter(fn: (r) => r["_field"] == "mass_pm10")
+            |> filter(fn: (r) => r["device"] == "/dev/ttyUSB0")
+            |> aggregateWindow(every: 1s, fn: mean, createEmpty: false)
+            |> pivot(rowKey: ["_time"], columnKey: ["_field"], valueColumn: "_value")
+            |> group()
+    
+        join.time(
+            left: xs,
+            right: sensor_values,
+            as: (l, r) => (
+                {
+                    l with
+                    mass_pm10: r.mass_pm10
+                }),
+            method: "inner"
+        )
+            |> sort(columns: ["_time"])
       `;
       const heatMapQuery = `
         import "join"
@@ -149,8 +171,9 @@ function Map() {
           ],
     [null, []]
   );
-  const gridCellElements = gridCells.map(({ gridX, gridY, intensity }) => (
+  const gridCellElements = gridCells.map(({ gridX, gridY, intensity }, index) => (
     <rect
+      key={index}
       x={gridX * GRID_SIZE}
       y={gridY * GRID_SIZE}
       width={GRID_SIZE}
