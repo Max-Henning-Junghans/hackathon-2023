@@ -6,10 +6,10 @@ function Graphs(props) {
         <Plot
         data={[
 		{
-			x: [1, 2, 3],
-			y: [2, 6, 3],
+			x: [1, 2, 3, 4, 5, 6],
+			y: [2, 6, 3, 1, 2, 3],
 			type: 'scatter',
-			mode: 'lines+markers',
+			mode: 'lines',
 			marker: {color: 'red'},
 		},
 			{type: 'bar', x: [1, 2, 3], y: [2, 5, 3]},
