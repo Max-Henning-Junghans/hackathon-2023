@@ -1,13 +1,15 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { InfluxDB } from "@influxdata/influxdb-client";
 
-const MINIMUM_X = -2;
-const MINIMUM_Y = -2;
-const MAXIMUM_X = 2;
-const MAXIMUM_Y = 2;
+const MINIMUM_X = -0.5;
+const MINIMUM_Y = -0.5;
+const MAXIMUM_X = 1.5;
+const MAXIMUM_Y = 1.5;
 
 const MINIMUM_INTENSITY = 0;
-const MAXIMUM_INTENSITY = 5;
+const MAXIMUM_INTENSITY = 25;
+
+const GRID_SIZE = 0.2;
 
 const TOKEN =
   "3zK40TmVz0-kpnise5PejCO40GhgIxFKcAORGB2hnjbNHXjwqgC9FvxcmDFjdq-asdPoZurO02n9mTp-1jJZCA==";
@@ -18,48 +20,48 @@ function Map() {
   const api = useMemo(() => new InfluxDB({ url: URL, token: TOKEN }));
 
   const [positionsWithIntensities, setPositionsWithIntensities] = useState([]);
+  const [gridCells, setGridCells] = useState([]);
 
   useEffect(() => {
     const interval = setInterval(() => {
       const queryApi = api.getQueryApi(ORG);
       const timeSpan = "-60s";
-      const query = `import "join"
-      positions =
+      const timeSeriesQuery = `
+        import "join"
         from(bucket: "robomaster")
-          |> range(start: ${timeSpan})
-          |> filter(fn: (r) => r["_measurement"] == "simulated_robot")
-          |> filter(fn: (r) => r["_field"] == "x" or r["_field"] == "y")
-          |> aggregateWindow(every: 1s, fn: mean, createEmpty: false)
-          |> keep(columns: ["_time", "_field", "_value"])
-          |> pivot(rowKey: ["_time"], columnKey: ["_field"], valueColumn: "_value")
-          |> group()
-  
-      sensor_values = 
+        |> range(start: ${timeSpan})
+        |> filter(fn: (r) => r["_measurement"] == "robot_position" or r["_measurement"] == "sps30")
+        |> filter(fn: (r) => r["_field"] == "x" or r["_field"] == "y" or r["_field"] == "mass_pm10") // maybe delete them to get all values?
+        |> aggregateWindow(every: 1s, fn: mean, createEmpty: false)
+        |> keep(columns: ["_time", "_field", "_value"])
+        |> pivot(rowKey: ["_time"], columnKey: ["_field"], valueColumn: "_value")
+        |> group()
+        |> sort(columns: ["_time"])
+      `;
+      const heatMapQuery = `
+        import "join"
         from(bucket: "robomaster")
-          |> range(start: ${timeSpan})
-          |> filter(fn: (r) => r["_measurement"] == "sps30")
-          |> filter(fn: (r) => r["_field"] == "mass_pm10")
-          |> filter(fn: (r) => r["device"] == "/dev/ttyUSB0")
-          |> aggregateWindow(every: 1s, fn: mean, createEmpty: false)
-          |> pivot(rowKey: ["_time"], columnKey: ["_field"], valueColumn: "_value")
-          |> group()
-  
-      join.time(
-          left: positions,
-          right: sensor_values,
-          as: (l, r) => (
-              {
-                  l with
-                  mass_pm10: r.mass_pm10
-              }),
-          method: "inner"
-      )
-      |> sort(columns: ["_time"])`;
-      const rows = [];
-      queryApi.queryRows(query, {
+        |> range(start: ${timeSpan})
+        |> filter(fn: (r) => r["_measurement"] == "robot_position" or r["_measurement"] == "sps30")
+        |> filter(fn: (r) => r["_field"] == "x" or r["_field"] == "y" or r["_field"] == "mass_pm10") // maybe delete them to get all values?
+        |> aggregateWindow(every: 1s, fn: mean, createEmpty: false)
+        |> keep(columns: ["_time", "_field", "_value"])
+        |> pivot(rowKey: ["_time"], columnKey: ["_field"], valueColumn: "_value")
+        |> group()
+        |> map(fn: (r) => ({
+            r with
+            grid_x: int(v: r.x * ${(1 / GRID_SIZE).toFixed(4)}),
+            grid_y: int(v: r.y * ${(1 / GRID_SIZE).toFixed(4)})
+        }))
+        |> group(columns: ["grid_x", "grid_y"])
+        |> last(column: "_time")
+        |> group()
+      `;
+      const timeSeriesRows = [];
+      queryApi.queryRows(timeSeriesQuery, {
         next: (row, tableMeta) => {
           const tableObject = tableMeta.toObject(row);
-          rows.push({
+          timeSeriesRows.push({
             time: tableObject._time,
             x: tableObject.x,
             y: tableObject.y,
@@ -77,14 +79,39 @@ function Map() {
           console.error("Error", error);
         },
         complete: () => {
-          setPositionsWithIntensities(rows);
+          setPositionsWithIntensities(timeSeriesRows);
+        },
+      });
+      const heatMapRows = [];
+      queryApi.queryRows(heatMapQuery, {
+        next: (row, tableMeta) => {
+          const tableObject = tableMeta.toObject(row);
+          heatMapRows.push({
+            time: tableObject._time,
+            gridX: tableObject.grid_x,
+            gridY: tableObject.grid_y,
+            intensity: Math.max(
+              0,
+              Math.min(
+                1,
+                (tableObject.mass_pm10 - MINIMUM_INTENSITY) /
+                  (MAXIMUM_INTENSITY - MINIMUM_INTENSITY)
+              )
+            ),
+          });
+        },
+        error: (error) => {
+          console.error("Error", error);
+        },
+        complete: () => {
+          setGridCells(heatMapRows);
         },
       });
     }, 1000);
     return () => {
       clearInterval(interval);
     };
-  }, [api]);
+  }, []);
 
   const numberOfSegments = positionsWithIntensities.length;
   const pathPoints = positionsWithIntensities.map(
@@ -122,6 +149,15 @@ function Map() {
           ],
     [null, []]
   );
+  const gridCellElements = gridCells.map(({ gridX, gridY, intensity }) => (
+    <rect
+      x={gridX * GRID_SIZE}
+      y={gridY * GRID_SIZE}
+      width={GRID_SIZE}
+      height={GRID_SIZE}
+      fill={`rgba(0, 0, 255, ${intensity})`}
+    />
+  ));
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -129,6 +165,7 @@ function Map() {
         MAXIMUM_Y - MINIMUM_Y
       }`}
     >
+      {gridCellElements}
       {pathLines}
       {pathPoints}
     </svg>
