@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from 'react'
 
-function Canvas(props) {
+function CanvasMap(props) {
 
     const canvasRef = useRef(null)
 
@@ -23,4 +23,4 @@ function Canvas(props) {
   return <canvas ref={canvasRef} {...props}/>
 }
 
-export default Canvas;
+export default CanvasMap;
