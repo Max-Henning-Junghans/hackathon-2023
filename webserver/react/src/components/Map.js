@@ -62,6 +62,7 @@ function Map() {
       `;
       const heatMapQuery = `
         import "join"
+        import "math"
         from(bucket: "robomaster")
         |> range(start: ${timeSpan})
         |> filter(fn: (r) => r["_measurement"] == "robot_position" or r["_measurement"] == "sps30")
@@ -72,8 +73,8 @@ function Map() {
         |> group()
         |> map(fn: (r) => ({
             r with
-            grid_x: int(v: r.x * ${(1 / GRID_SIZE).toFixed(4)}),
-            grid_y: int(v: r.y * ${(1 / GRID_SIZE).toFixed(4)})
+            grid_x: int(v: r.x * ${(1 / GRID_SIZE).toFixed(4)} + 0.5),
+            grid_y: int(v: r.y * ${(1 / GRID_SIZE).toFixed(4)} + 0.5)
         }))
         |> group(columns: ["grid_x", "grid_y"])
         |> last(column: "_time")
@@ -174,8 +175,8 @@ function Map() {
   const gridCellElements = gridCells.map(({ gridX, gridY, intensity }, index) => (
     <rect
       key={index}
-      x={gridX * GRID_SIZE}
-      y={gridY * GRID_SIZE}
+      x={gridX * GRID_SIZE - (GRID_SIZE / 2)}
+      y={gridY * GRID_SIZE - (GRID_SIZE / 2)}
       width={GRID_SIZE}
       height={GRID_SIZE}
       fill={`rgba(0, 0, 255, ${intensity})`}
