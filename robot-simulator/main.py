@@ -24,11 +24,14 @@ target = np.array([0.0, 0.0])
 app = Flask(__name__)
 
 
-@app.route("/drive", methods=["POST"])
+@app.route("/", methods=["POST"])
 def drive():
     global target
     data = request.get_json()
-    target = data["target"]
+    target = np.array([data["x"], data["y"]])
+    while (target != position).all():
+        print("while")
+        continue
     return "OK"
 
 
