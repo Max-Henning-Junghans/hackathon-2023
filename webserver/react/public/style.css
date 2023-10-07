@@ -1,0 +1,18 @@
+html,
+body,
+#root {
+  width: 100vw;
+  height: 100vh;
+  margin: 0;
+}
+
+#root {
+  grid-template-columns: auto;
+  grid-template-rows: auto;
+}
+
+svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}

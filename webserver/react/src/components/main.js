@@ -1,17 +1,7 @@
-import CanvasMap from "./CanvasMap";
-import Graphs from "./Graphs";
-import CanvasHeat from "./CanvasHeat";
+import Map from "./Map";
 
 function Main() {
-    return (
-        <div className="d-flex justify-content-center">
-            <div className="d-flex flex-column">
-                <CanvasMap/>
-                <Graphs/>
-                <CanvasHeat/>
-            </div>
-        </div>
-    );
+  return <Map />;
 }
 
 export default Main;
