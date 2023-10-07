@@ -31,7 +31,8 @@ queryApi.queryRows(fluxQuery, {
     console.log('\nSuccess')
   },
 })
-console.log(y_values)
+x_values.map(x => return x.replace("T", " "))
+console.log(x_values)
 
 
     return (
@@ -46,7 +47,11 @@ console.log(y_values)
 				name: 'Test'
 			}
         ]}
-        layout={ {width: "100%", height: "100%", title: 'A Fancy Plot'} }
+        layout={
+        width: "100%",
+        height: "100%",
+        title: 'A Fancy Plot',
+        } }
         />
     );
 }
