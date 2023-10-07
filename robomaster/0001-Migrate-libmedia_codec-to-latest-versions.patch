@@ -1,0 +1,164 @@
+From d5c356308430b1f56ae306c8a8e91402c977819f Mon Sep 17 00:00:00 2001
+From: Hendrik <git@h3ndrk.de>
+Date: Sat, 7 Oct 2023 08:08:49 +0200
+Subject: [PATCH] Migrate libmedia_codec to latest versions
+
+---
+ lib/libmedia_codec/src/media_codec.cpp |  8 ++++
+ lib/libmedia_codec/src/media_codec.h   | 52 +++++++++++++-------------
+ 2 files changed, 35 insertions(+), 25 deletions(-)
+
+diff --git a/lib/libmedia_codec/src/media_codec.cpp b/lib/libmedia_codec/src/media_codec.cpp
+index f0146dd..8ed5947 100644
+--- a/lib/libmedia_codec/src/media_codec.cpp
++++ b/lib/libmedia_codec/src/media_codec.cpp
+@@ -22,3 +22,11 @@ PYBIND11_MODULE(libmedia_codec, m) {
+     vd.def("decode", &PyH264Decoder::decode, "H264 decode function",py::arg("input"));
+ 
+ }
++
++int row_size(const AVFrame &f) { return f.linesize[0]; }
++
++void disable_logging() { av_log_set_level(AV_LOG_QUIET); }
++
++std::pair<int, int> width_height(const AVFrame &f) {
++    return std::make_pair(f.width, f.height);
++}
+diff --git a/lib/libmedia_codec/src/media_codec.h b/lib/libmedia_codec/src/media_codec.h
+index 5cb1d0a..300008b 100644
+--- a/lib/libmedia_codec/src/media_codec.h
++++ b/lib/libmedia_codec/src/media_codec.h
+@@ -3,8 +3,10 @@
+ 
+ 
+ extern "C" {
++#include <libavcodec/packet.h>
+ #include <libavcodec/avcodec.h>
+ #include <libavutil/avutil.h>
++#include <libavutil/imgutils.h>
+ #include <libavutil/mem.h>
+ #include <libswscale/swscale.h>
+ }
+@@ -52,13 +54,14 @@ class H264Decoder {
+ private:
+     AVCodecContext        *context;
+     AVFrame               *frame;
+-    AVCodec               *codec;
++    AVCodec const         *codec;
+     AVCodecParserContext  *parser;
+     AVPacket              *pkt;
+ 
+ public:
+     H264Decoder() {
+-        avcodec_register_all();
++        // https://trac.ffmpeg.org/wiki/Bump59
++        // avcodec_register_all();
+ 
+         codec = avcodec_find_decoder(AV_CODEC_ID_H264);
+         if (!codec)
+@@ -68,9 +71,10 @@ public:
+         if (!context)
+             throw CodecException("H264Decoder: avcodec_alloc_context3 failed!");
+ 
+-        if(codec->capabilities & CODEC_CAP_TRUNCATED) {
+-            context->flags |= CODEC_FLAG_TRUNCATED;
+-        }
++        // https://github.com/FFmpeg/FFmpeg/commit/3ceffe783965767e62d59e8e68ecd265c98460ec
++        // if(codec->capabilities & CODEC_CAP_TRUNCATED) {
++        //     context->flags |= CODEC_FLAG_TRUNCATED;
++        // }
+ 
+         int err = avcodec_open2(context, codec, nullptr);
+         if (err < 0)
+@@ -84,10 +88,10 @@ public:
+         if (!frame)
+             throw CodecException("H264Decoder: av_frame_alloc failed!");
+ 
+-        pkt = new AVPacket;
++        // https://gitlab.com/OpenMW/openmw/-/issues/6088
++        pkt = av_packet_alloc();
+         if (!pkt)
+             throw CodecException("H264Decoder: alloc AVPacket failed!");
+-        av_init_packet(pkt);
+     }
+ 
+     ~H264Decoder() {
+@@ -110,10 +114,13 @@ public:
+     }
+ 
+     const AVFrame& decode_frame() {
+-        int got_picture = 0;
+-        int nread = avcodec_decode_video2(context, frame, &got_picture, pkt);
+-        if (nread < 0 || got_picture == 0)
+-            throw CodecException("H264Decoder: decode_frame, avcodec_decode_video2 failed!");
++        // https://github.com/pesintta/vdr-plugin-vaapidevice/pull/38/files
++        if (avcodec_send_packet(context, pkt) < 0) {
++            throw CodecException("H264Decoder: avcodec_send_packet failed!");
++        }
++        if (avcodec_receive_frame(context, frame) < 0) {
++            throw CodecException("H264Decoder: avcodec_receive_frame failed!");
++        }
+         return *frame;
+     }
+ };
+@@ -140,7 +147,7 @@ public:
+     }
+ 
+     int predict_size(int w, int h) {
+-        return avpicture_fill((AVPicture*)output_frame_, nullptr, output_format_, w, h);
++        return av_image_get_buffer_size(output_format_, w, h, 32);
+     }
+ 
+     const AVFrame& convert(const AVFrame &frame, unsigned char* out_bgr) {
+@@ -154,7 +161,8 @@ public:
+         if (!context_)
+             throw CodecException("FormatConverter: convert, sws_getCachedContext failed!");
+ 
+-        avpicture_fill((AVPicture*)output_frame_, out_bgr, output_format_, w, h);
++        // https://mail.gnome.org/archives/commits-list/2016-February/msg05531.html
++        av_image_fill_arrays(output_frame_->data, output_frame_->linesize, out_bgr, output_format_, w, h, 32);
+ 
+         sws_scale(context_, frame.data, frame.linesize, 0, h,
+                   output_frame_->data, output_frame_->linesize);
+@@ -164,18 +172,11 @@ public:
+     }
+ };
+ 
+-void disable_logging() {
+-    av_log_set_level(AV_LOG_QUIET);
+-}
+-
+-std::pair<int, int> width_height(const AVFrame& f) {
+-    return std::make_pair(f.width, f.height);
+-}
++void disable_logging();
+ 
+-int row_size(const AVFrame& f) {
+-    return f.linesize[0];
+-}
++std::pair<int, int> width_height(const AVFrame &f);
+ 
++int row_size(const AVFrame &f);
+ 
+ class PyH264Decoder {
+ public:
+@@ -186,7 +187,8 @@ public:
+         py::gil_scoped_release decode_release;
+         num_consumed = decoder->parse((ubyte*)data_in, len);
+ 
+-        if (is_frame_available = decoder->is_frame_available()) {
++        is_frame_available = decoder->is_frame_available();
++        if (is_frame_available) {
+             const auto &frame = decoder->decode_frame();
+             int w, h; std::tie(w,h) = width_height(frame);
+             Py_ssize_t out_size = converter->predict_size(w,h);
+@@ -309,4 +311,4 @@ private:
+     opus_int16 *int16_raw_;
+ };
+ 
+-#endif
+\ No newline at end of file
++#endif
+-- 
+2.42.0
+
