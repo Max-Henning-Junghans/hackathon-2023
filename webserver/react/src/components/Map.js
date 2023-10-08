@@ -27,7 +27,7 @@ const URL = "http://localhost:3000";
 const ORG = "draeger";
 
 function Map() {
-  const api = useMemo(() => new InfluxDB({ url: URL, token: TOKEN }));
+  const api = useMemo(() => new InfluxDB({ url: URL, token: TOKEN }), []);
 
   const [positions, setPositions] = useState({});
   const [intensities, setIntensities] = useState({});
@@ -152,7 +152,7 @@ function Map() {
     return () => {
       clearInterval(interval);
     };
-  }, []);
+  }, [api]);
 
   const xzones = Object.entries(XZONES).map(([name, { x, y }]) => (
     <>

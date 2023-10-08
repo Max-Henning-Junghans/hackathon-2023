@@ -7,7 +7,8 @@ body,
 }
 
 #root {
-  grid-template-columns: auto;
+  display: grid;
+  grid-template-columns: 1fr 500px;
   grid-template-rows: auto;
 }
 

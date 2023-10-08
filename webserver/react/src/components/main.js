@@ -1,7 +1,13 @@
+import Graph from "./Graph";
 import Map from "./Map";
 
 function Main() {
-  return <Map />;
+  return (
+    <>
+      <Map />
+      <Graph />
+    </>
+  );
 }
 
 export default Main;
