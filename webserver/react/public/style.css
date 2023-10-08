@@ -13,6 +13,15 @@ img#logo {
   left: 35px;
 }
 
+div#name {
+  position: absolute;
+  top: 24px;
+  left: 210px;
+  font-family: Helvetica;
+  font-weight: bold;
+  font-size: 60px;
+}
+
 #root {
   display: grid;
   grid-template-columns: 1fr 500px;
