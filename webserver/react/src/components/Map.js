@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { InfluxDB } from "@influxdata/influxdb-client";
 
-const MINIMUM_X = -0.1;
-const MINIMUM_Y = -0.1;
-const MAXIMUM_X = 2.1;
-const MAXIMUM_Y = 2.1;
+const MINIMUM_X = -0.3;
+const MINIMUM_Y = -0.3;
+const MAXIMUM_X = 2.3;
+const MAXIMUM_Y = 2.3;
 
 const MINIMUM_INTENSITY = 0;
 const MAXIMUM_INTENSITY = 100;
@@ -16,15 +16,19 @@ const GRID_SIZE = 0.2;
 const CIRCLE_FACTOR = 0.1;
 
 const XZONES = {
-  "ARHE-0129": { x: 0.5, y: 0.5 },
-  "ARJF-0036": { x: 1, y: 0.5 },
+  "ARHE-0129": { x: 2, y: 0 },
+  "ARJF-0036": { x: 0, y: 2 },
 };
-const XZONE_SIZE = 0.1;
+const XZONE_SIZE = 0.15;
 
 const TOKEN =
   "3zK40TmVz0-kpnise5PejCO40GhgIxFKcAORGB2hnjbNHXjwqgC9FvxcmDFjdq-asdPoZurO02n9mTp-1jJZCA==";
 const URL = "http://localhost:3000";
 const ORG = "draeger";
+
+function transformPosition(x, y) {
+  return [y, x];
+}
 
 function Map() {
   const api = useMemo(() => new InfluxDB({ url: URL, token: TOKEN }), []);
@@ -44,17 +48,27 @@ function Map() {
     const trailTimes = sortedTimes.filter(
       (time) => Date.parse(time) >= Date.now() - TIME_SPAN_TRAIL_SECONDS * 1000
     );
-    return trailTimes.map((time) => ({
-      time,
-      x: positions[time].x,
-      y: positions[time].y,
-    }));
+    return trailTimes.map((time) => {
+      const [transformedX, transformedY] = transformPosition(
+        positions[time].x,
+        positions[time].y
+      );
+      return {
+        time,
+        x: transformedX,
+        y: transformedY,
+      };
+    });
   }, [positions, sortedTimes]);
   const heatMapCells = useMemo(() => {
     const cells = {};
     for (const time of sortedTimes.toReversed()) {
-      const cellX = Math.floor(positions[time].x * (1 / GRID_SIZE) + 0.5);
-      const cellY = Math.floor(positions[time].y * (1 / GRID_SIZE) + 0.5);
+      const [transformedX, transformedY] = transformPosition(
+        positions[time].x,
+        positions[time].y
+      );
+      const cellX = Math.floor(transformedX * (1 / GRID_SIZE) + 0.5);
+      const cellY = Math.floor(transformedY * (1 / GRID_SIZE) + 0.5);
       const cellIndex = `${cellX}:${cellY}`;
       if (cells[cellIndex] === undefined) {
         cells[cellIndex] = intensities[time];
@@ -212,7 +226,7 @@ function Map() {
       y={y * GRID_SIZE - GRID_SIZE / 2}
       width={GRID_SIZE}
       height={GRID_SIZE}
-      fill={`rgba(0, 0, 255, ${intensity})`}
+      fill={`rgba(0, 0, 255, ${intensity * 0.25})`}
     />
   ));
   const robotPosition = trailPositions[trailPositions.length - 1];
