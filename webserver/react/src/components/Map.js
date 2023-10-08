@@ -9,7 +9,7 @@ const MAXIMUM_Y = 1.5;
 const MINIMUM_INTENSITY = 0;
 const MAXIMUM_INTENSITY = 25;
 
-const TIME_SPAN_PATH = "-60s";
+const TIME_SPAN_PATH = "-30s";
 const TIME_SPAN_HEAT_MAP = "-6000s";
 
 const GRID_SIZE = 0.2;
