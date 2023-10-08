@@ -1,18 +1,19 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { InfluxDB } from "@influxdata/influxdb-client";
 
-const MINIMUM_X = -0.5;
-const MINIMUM_Y = -0.5;
-const MAXIMUM_X = 1.5;
-const MAXIMUM_Y = 1.5;
+const MINIMUM_X = -0.1;
+const MINIMUM_Y = -0.1;
+const MAXIMUM_X = 2.1;
+const MAXIMUM_Y = 2.1;
 
 const MINIMUM_INTENSITY = 0;
-const MAXIMUM_INTENSITY = 25;
+const MAXIMUM_INTENSITY = 100;
 
-const TIME_SPAN_PATH = "-30s";
-const TIME_SPAN_HEAT_MAP = "-6000s";
+const TIME_SPAN = "-600s";
+const TIME_SPAN_TRAIL_SECONDS = 30;
 
 const GRID_SIZE = 0.2;
+const CIRCLE_FACTOR = 0.1;
 
 const XZONES = {
   "ARHE-0129": { x: 0.5, y: 0.5 },
@@ -28,66 +29,68 @@ const ORG = "draeger";
 function Map() {
   const api = useMemo(() => new InfluxDB({ url: URL, token: TOKEN }));
 
-  const [positionsWithIntensities, setPositionsWithIntensities] = useState([]);
-  const [gridCells, setGridCells] = useState([]);
+  const [positions, setPositions] = useState({});
+  const [intensities, setIntensities] = useState({});
   const [xzoneIntensities, setXzoneIntensities] = useState({});
+
+  const sortedTimes = useMemo(
+    () =>
+      Object.keys(positions).toSorted(
+        (left, right) => Date.parse(left) - Date.parse(right)
+      ),
+    [positions]
+  );
+  const trailPositions = useMemo(() => {
+    const trailTimes = sortedTimes.filter(
+      (time) => Date.parse(time) >= Date.now() - TIME_SPAN_TRAIL_SECONDS * 1000
+    );
+    return trailTimes.map((time) => ({
+      time,
+      x: positions[time].x,
+      y: positions[time].y,
+    }));
+  }, [positions, sortedTimes]);
+  const heatMapCells = useMemo(() => {
+    const cells = {};
+    for (const time of sortedTimes.toReversed()) {
+      const cellX = Math.floor(positions[time].x * (1 / GRID_SIZE) + 0.5);
+      const cellY = Math.floor(positions[time].y * (1 / GRID_SIZE) + 0.5);
+      const cellIndex = `${cellX}:${cellY}`;
+      if (cells[cellIndex] === undefined) {
+        cells[cellIndex] = intensities[time];
+      }
+    }
+    return Object.entries(cells)
+      .filter(([_cellIndex, intensity]) => intensity !== undefined)
+      .map(([cellIndex, intensity]) => {
+        const [cellX, cellY] = cellIndex.split(":");
+        return { x: cellX, y: cellY, intensity };
+      });
+  }, [positions, intensities, sortedTimes]);
 
   useEffect(() => {
     const interval = setInterval(() => {
       const queryApi = api.getQueryApi(ORG);
-      const timeSeriesQuery = `
-        import "join"
-        xs =
-          from(bucket: "robomaster")
-            |> range(start: ${TIME_SPAN_PATH})
-            |> filter(fn: (r) => r["_measurement"] == "simulated_robot")
-            |> filter(fn: (r) => r["_field"] == "x" or r["_field"] == "y")
-            |> aggregateWindow(every: 1s, fn: mean, createEmpty: false)
-            |> keep(columns: ["_time", "_field", "_value"])
-            |> pivot(rowKey: ["_time"], columnKey: ["_field"], valueColumn: "_value")
-            |> group()
-    
-        sensor_values = 
-          from(bucket: "robomaster")
-            |> range(start: ${TIME_SPAN_PATH})
-            |> filter(fn: (r) => r["_measurement"] == "sps30")
-            |> filter(fn: (r) => r["_field"] == "mass_pm10")
-            |> filter(fn: (r) => r["device"] == "/dev/ttyUSB0")
-            |> aggregateWindow(every: 1s, fn: mean, createEmpty: false)
-            |> pivot(rowKey: ["_time"], columnKey: ["_field"], valueColumn: "_value")
-            |> group()
-    
-        join.time(
-            left: xs,
-            right: sensor_values,
-            as: (l, r) => (
-                {
-                    l with
-                    mass_pm10: r.mass_pm10
-                }),
-            method: "inner"
-        )
-            |> sort(columns: ["_time"])
-      `;
-      const heatMapQuery = `
-        import "join"
-        import "math"
+      const positionsQuery = `
         from(bucket: "robomaster")
-        |> range(start: ${TIME_SPAN_HEAT_MAP})
-        |> filter(fn: (r) => r["_measurement"] == "simulated_robot" or r["_measurement"] == "sps30")
-        |> filter(fn: (r) => r["_field"] == "x" or r["_field"] == "y" or r["_field"] == "mass_pm10") // maybe delete them to get all values?
-        |> aggregateWindow(every: 1s, fn: mean, createEmpty: false)
-        |> keep(columns: ["_time", "_field", "_value"])
-        |> pivot(rowKey: ["_time"], columnKey: ["_field"], valueColumn: "_value")
-        |> group()
-        |> map(fn: (r) => ({
-            r with
-            grid_x: int(v: r.x * ${(1 / GRID_SIZE).toFixed(4)} + 0.5),
-            grid_y: int(v: r.y * ${(1 / GRID_SIZE).toFixed(4)} + 0.5)
-        }))
-        |> group(columns: ["grid_x", "grid_y"])
-        |> last(column: "_time")
-        |> group()
+          |> range(start: ${TIME_SPAN})
+          |> filter(fn: (r) => r["_measurement"] == "robot_position")
+          |> filter(fn: (r) => r["_field"] == "x" or r["_field"] == "y")
+          |> aggregateWindow(every: 1s, fn: mean, createEmpty: false)
+          |> keep(columns: ["_time", "_field", "_value"])
+          |> pivot(rowKey: ["_time"], columnKey: ["_field"], valueColumn: "_value")
+          |> group()
+      `;
+      const intensitiesQuery = `
+        from(bucket: "robomaster")
+          |> range(start: ${TIME_SPAN})
+          |> filter(fn: (r) => r["_measurement"] == "sps30")
+          |> filter(fn: (r) => r["_field"] == "mass_pm10")
+          |> filter(fn: (r) => r["device"] == "/dev/ttyUSB0")
+          |> aggregateWindow(every: 1s, fn: mean, createEmpty: false)
+          |> keep(columns: ["_time", "_field", "_value"])
+          |> pivot(rowKey: ["_time"], columnKey: ["_field"], valueColumn: "_value")
+          |> group()
       `;
       const xzoneQuery = `
         from(bucket: "robomaster")
@@ -96,54 +99,40 @@ function Map() {
         |> filter(fn: (r) => r["_field"] == "CO2VOL") // maybe delete them to get all values?
         |> last()
       `;
-      const timeSeriesRows = [];
-      queryApi.queryRows(timeSeriesQuery, {
+      const positionsData = {};
+      queryApi.queryRows(positionsQuery, {
         next: (row, tableMeta) => {
           const tableObject = tableMeta.toObject(row);
-          timeSeriesRows.push({
-            time: tableObject._time,
+          positionsData[tableObject._time] = {
             x: tableObject.x,
             y: tableObject.y,
-            intensity: Math.max(
-              0,
-              Math.min(
-                1,
-                (tableObject.mass_pm10 - MINIMUM_INTENSITY) /
-                  (MAXIMUM_INTENSITY - MINIMUM_INTENSITY)
-              )
-            ),
-          });
+          };
         },
         error: (error) => {
           console.error("Error", error);
         },
         complete: () => {
-          setPositionsWithIntensities(timeSeriesRows);
+          setPositions(positionsData);
         },
       });
-      const heatMapRows = [];
-      queryApi.queryRows(heatMapQuery, {
+      const intensitiesData = {};
+      queryApi.queryRows(intensitiesQuery, {
         next: (row, tableMeta) => {
           const tableObject = tableMeta.toObject(row);
-          heatMapRows.push({
-            time: tableObject._time,
-            gridX: tableObject.grid_x,
-            gridY: tableObject.grid_y,
-            intensity: Math.max(
-              0,
-              Math.min(
-                1,
-                (tableObject.mass_pm10 - MINIMUM_INTENSITY) /
-                  (MAXIMUM_INTENSITY - MINIMUM_INTENSITY)
-              )
-            ),
-          });
+          intensitiesData[tableObject._time] = Math.max(
+            0,
+            Math.min(
+              1,
+              (tableObject.mass_pm10 - MINIMUM_INTENSITY) /
+                (MAXIMUM_INTENSITY - MINIMUM_INTENSITY)
+            )
+          );
         },
         error: (error) => {
           console.error("Error", error);
         },
         complete: () => {
-          setGridCells(heatMapRows);
+          setIntensities(intensitiesData);
         },
       });
       const collectedXzoneIntensities = {};
@@ -183,19 +172,17 @@ function Map() {
     </>
   ));
 
-  const numberOfSegments = positionsWithIntensities.length;
-  const pathPoints = positionsWithIntensities.map(
-    ({ x, y, intensity }, index) => (
-      <circle
-        key={index}
-        r={intensity * 0.25}
-        cx={x}
-        cy={y}
-        fill="rgba(0, 0, 255, 0.25)"
-      />
-    )
-  );
-  const [_, pathLines] = positionsWithIntensities.reduce(
+  const numberOfSegments = trailPositions.length;
+  const pathPoints = trailPositions.map(({ time, x, y }, index) => (
+    <circle
+      key={index}
+      r={intensities[time] * CIRCLE_FACTOR}
+      cx={x}
+      cy={y}
+      fill="rgba(0, 0, 255, 0.25)"
+    />
+  ));
+  const [_, pathLines] = trailPositions.reduce(
     ([previous, pathLines], current, index) =>
       previous === null
         ? [current, pathLines]
@@ -218,20 +205,17 @@ function Map() {
           ],
     [null, []]
   );
-  const gridCellElements = gridCells.map(
-    ({ gridX, gridY, intensity }, index) => (
-      <rect
-        key={index}
-        x={gridX * GRID_SIZE - GRID_SIZE / 2}
-        y={gridY * GRID_SIZE - GRID_SIZE / 2}
-        width={GRID_SIZE}
-        height={GRID_SIZE}
-        fill={`rgba(0, 0, 255, ${intensity})`}
-      />
-    )
-  );
-  const robotPosition =
-    positionsWithIntensities[positionsWithIntensities.length - 1];
+  const gridCellElements = heatMapCells.map(({ x, y, intensity }, index) => (
+    <rect
+      key={index}
+      x={x * GRID_SIZE - GRID_SIZE / 2}
+      y={y * GRID_SIZE - GRID_SIZE / 2}
+      width={GRID_SIZE}
+      height={GRID_SIZE}
+      fill={`rgba(0, 0, 255, ${intensity})`}
+    />
+  ));
+  const robotPosition = trailPositions[trailPositions.length - 1];
   const robotImage = robotPosition && (
     <image
       x={robotPosition.x - XZONE_SIZE / 2}
