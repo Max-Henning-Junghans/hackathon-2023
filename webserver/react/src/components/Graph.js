@@ -53,7 +53,7 @@ function Graph() {
           y: xs,
           type: "scatter+markers",
           mode: "lines",
-          marker: { color: "red" },
+          marker: { color: "#0028c6" },
           name: "pm10",
         },
       ]}

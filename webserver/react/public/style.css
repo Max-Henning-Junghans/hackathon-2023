@@ -6,6 +6,13 @@ body,
   margin: 0;
 }
 
+img#logo {
+  position: absolute;
+  width: 150px;
+  top: 35px;
+  left: 35px;
+}
+
 #root {
   display: grid;
   grid-template-columns: 1fr 500px;

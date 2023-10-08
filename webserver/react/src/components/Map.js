@@ -174,7 +174,7 @@ function Map() {
         r={xzoneIntensities[name]}
         cx={x}
         cy={y}
-        fill="rgba(0, 0, 255, 0.25)"
+        fill="rgba(0, 30, 186, 0.25)"
       />
       <image
         x={x - XZONE_SIZE / 2}
@@ -193,7 +193,7 @@ function Map() {
       r={intensities[time] * CIRCLE_FACTOR}
       cx={x}
       cy={y}
-      fill="rgba(0, 0, 255, 0.25)"
+      fill="rgba(0, 30, 186, 0.25)"
     />
   ));
   const [_, pathLines] = trailPositions.reduce(
@@ -226,7 +226,7 @@ function Map() {
       y={y * GRID_SIZE - GRID_SIZE / 2}
       width={GRID_SIZE}
       height={GRID_SIZE}
-      fill={`rgba(0, 0, 255, ${intensity * 0.25})`}
+      fill={`rgba(0, 30, 186, ${intensity * 0.5})`}
     />
   ));
   const robotPosition = trailPositions[trailPositions.length - 1];
